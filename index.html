@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta id="themeColorMeta" name="theme-color" content="#0a0f18" />
+    <title>工作所得评估计算器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar" role="banner">
+      <div class="topbar__left">
+        <div class="brand">
+          <div class="brand__title">工作所得评估计算器</div>
+          <div class="brand__subtitle">用「真实所得」和「劳动时长」横向对比工作的价值</div>
+        </div>
+      </div>
+      <div class="topbar__right">
+        <button id="themeToggleBtn" class="topbar__theme-btn" type="button" aria-label="切换为明亮模式" title="切换为明亮模式">
+          ☀
+        </button>
+        <label class="topbar__field">
+          <span class="topbar__field-label">比较货币</span>
+          <select id="compareCurrencySelect" class="topbar__select" aria-label="比较货币（统计展示）"></select>
+        </label>
+        <label class="topbar__field">
+          <span class="topbar__field-label">填写项</span>
+          <select id="inputViewModeSelect" class="topbar__select" aria-label="是否显示表格中的填写项">
+            <option value="full">显示全部（含填写项）</option>
+            <option value="results">仅看统计结果</option>
+          </select>
+        </label>
+        <div class="segmented" role="group" aria-label="展示口径">
+          <button class="segmented__btn is-active" data-period="month" type="button">按月</button>
+          <button class="segmented__btn" data-period="day" type="button">按日(工作日)</button>
+          <button class="segmented__btn" data-period="year" type="button">按年</button>
+        </div>
+        <button id="enterDemoBtn" class="btn" type="button" title="载入三项示范工作，演示页面用法">
+          示范
+        </button>
+        <button id="addJobBtn" class="btn btn-primary" type="button" title="添加对比工作（最多5个）">
+          <span class="btn__icon">＋</span>
+          添加工作
+        </button>
+      </div>
+    </header>
+
+    <div id="demoBanner" class="demo-banner is-hidden" role="region" aria-label="示范模式">
+      <div class="demo-banner__inner">
+        <p class="demo-banner__text">
+          当前为<strong>示范数据</strong>，表格内数值均可直接修改；下方汇率与换算使用实时接口。
+        </p>
+        <button id="exitDemoBtn" class="btn btn-primary" type="button">退出示范</button>
+      </div>
+    </div>
+
+    <main class="container">
+      <div class="focus-stage" id="mainFocusStage" data-job-count="1">
+        <section class="hint">
+          <div class="hint__item">
+            <span class="badge badge-green">绿色</span> 表示收入/盈余
+          </div>
+          <div class="hint__item">
+            <span class="badge badge-red">红色</span> 表示支出/赤字
+          </div>
+          <div class="hint__item hint__muted">
+            填完任意必填项会即时刷新可计算结果（数据保存在本地浏览器）。
+          </div>
+        </section>
+
+        <section class="compare compare--full" aria-label="Excel 风格对比表">
+          <div class="compare__header">
+            <div class="compare__title">对比表（同指标成行、同工作成列）</div>
+            <div class="compare__subtitle">可填写项直接在格子里输入；指标名下方为算式；“填写值”表示该项来自输入</div>
+          </div>
+          <div id="compareTable" class="compare__tableWrap"></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="site-footer" role="contentinfo">
+      <p class="site-footer__text">
+        本页工具仅供个人学习与跨地区<strong>对比参考</strong>；五险一金、个人所得税、美国预扣税、香港强积金与薪俸税等均为<strong>简化估算</strong>，未考虑个体全部情形。
+        <strong>不构成税务、法律或财务专业意见</strong>；重要决策请咨询合资格专业人士并以官方规定为准。
+      </p>
+    </footer>
+
+    <dialog id="taxDialog" class="dialog">
+      <div class="dialog__header">
+        <div class="dialog__title">个税细节</div>
+        <button class="icon-btn" data-close-dialog type="button" aria-label="关闭">✕</button>
+      </div>
+      <div id="taxDialogBody" class="dialog__body"></div>
+      <div class="dialog__footer">
+        <button class="btn" data-close-dialog type="button">关闭</button>
+      </div>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

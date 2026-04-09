@@ -1,0 +1,166 @@
+{
+  "byAdcode": {
+    "110000": {
+      "amount": 11297,
+      "year": 2023,
+      "note": "示例：城镇非私营单位就业人员年平均工资口径（元/月）；直辖市用省级 adcode；以本地统计局为准",
+      "sourceUrl": "https://rsj.beijing.gov.cn/"
+    },
+    "120000": {
+      "amount": 11870,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（天津市统计局2024）；以参保地文件为准",
+      "sourceUrl": "https://stats.tj.gov.cn/"
+    },
+    "210100": {
+      "amount": 9478,
+      "year": 2024,
+      "note": "示例：城镇非私营单位从业人员年平均工资÷12（沈阳市统计局2024）",
+      "sourceUrl": "https://tjj.shenyang.gov.cn/"
+    },
+    "210200": {
+      "amount": 9917,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（大连市统计局口径）",
+      "sourceUrl": "https://tjj.dl.gov.cn/"
+    },
+    "230100": {
+      "amount": 8251,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（口径见黑龙江省/哈尔滨市统计局发布）",
+      "sourceUrl": "https://tjj.hlj.gov.cn/"
+    },
+    "310000": {
+      "amount": 12183,
+      "year": 2024,
+      "note": "示例：元/月；直辖市用省级 adcode；以本地统计局为准",
+      "sourceUrl": "https://rsj.sh.gov.cn/"
+    },
+    "320100": {
+      "amount": 13365,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（南京市统计局2024）",
+      "sourceUrl": "https://tjj.nanjing.gov.cn/"
+    },
+    "320200": {
+      "amount": 11533,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（无锡市统计局2024）",
+      "sourceUrl": "https://tj.wuxi.gov.cn/"
+    },
+    "320500": {
+      "amount": 11968,
+      "year": 2024,
+      "note": "示例：城镇非私营单位在岗职工年平均工资÷12（苏州市统计局口径）",
+      "sourceUrl": "https://tjj.suzhou.gov.cn/"
+    },
+    "330100": {
+      "amount": 13565,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（杭州市统计局公报）",
+      "sourceUrl": "https://tjj.hangzhou.gov.cn/"
+    },
+    "330200": {
+      "amount": 11518,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（宁波市统计局2024）",
+      "sourceUrl": "https://tjj.ningbo.gov.cn/"
+    },
+    "340100": {
+      "amount": 10180,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（合肥市统计局2024）",
+      "sourceUrl": "https://tjj.hefei.gov.cn/"
+    },
+    "350100": {
+      "amount": 9365,
+      "year": 2024,
+      "note": "示例：福建省2024年城镇非私营单位就业人员年平均工资÷12（市级以福州市统计局最新发布为准）",
+      "sourceUrl": "https://tjj.fujian.gov.cn/"
+    },
+    "350200": {
+      "amount": 10782,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（厦门市统计局2024）",
+      "sourceUrl": "https://tjj.xm.gov.cn/"
+    },
+    "370100": {
+      "amount": 10862,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（济南市统计局2024）",
+      "sourceUrl": "https://tjj.jinan.gov.cn/"
+    },
+    "370200": {
+      "amount": 10818,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（青岛市统计局2024）",
+      "sourceUrl": "https://tjj.qingdao.gov.cn/"
+    },
+    "410100": {
+      "amount": 8890,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（郑州市统计局2024）",
+      "sourceUrl": "https://tjj.zhengzhou.gov.cn/"
+    },
+    "420100": {
+      "amount": 9410,
+      "year": 2024,
+      "note": "示例：城镇单位在岗职工年平均工资÷12（武汉市统计局2024）",
+      "sourceUrl": "https://tjj.wuhan.gov.cn/"
+    },
+    "430100": {
+      "amount": 8098,
+      "year": 2024,
+      "note": "示例：湖南省2024年城镇非私营单位就业人员年平均工资÷12（市级以长沙市统计局公布为准）",
+      "sourceUrl": "http://tjj.changsha.gov.cn/"
+    },
+    "440100": {
+      "amount": 9167,
+      "year": 2023,
+      "note": "示例：2023年省全口径城镇单位就业人员月平均工资口径（元/月）；广州市以本地人社局最新文件为准",
+      "sourceUrl": "https://hrss.gd.gov.cn/"
+    },
+    "440300": {
+      "amount": 12083,
+      "year": 2023,
+      "note": "示例：由年薪 145000 元换算为月薪（元/月），请以参保地人社局文件为准",
+      "sourceUrl": "https://hrss.sz.gov.cn/"
+    },
+    "440600": {
+      "amount": 9550,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（佛山市统计局口径）",
+      "sourceUrl": "https://tjj.foshan.gov.cn/"
+    },
+    "441900": {
+      "amount": 8755,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（东莞市统计/人社发布口径）",
+      "sourceUrl": "http://tjj.dg.gov.cn/"
+    },
+    "500000": {
+      "amount": 9796,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（重庆市统计局2024）",
+      "sourceUrl": "https://tjj.cq.gov.cn/"
+    },
+    "510100": {
+      "amount": 10459,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（成都市统计局2024）",
+      "sourceUrl": "https://tjj.chengdu.gov.cn/"
+    },
+    "530100": {
+      "amount": 10532,
+      "year": 2024,
+      "note": "示例：城镇非私营单位就业人员年平均工资÷12（昆明市统计局2024）",
+      "sourceUrl": "https://tjj.km.gov.cn/"
+    },
+    "610100": {
+      "amount": 8316,
+      "year": 2024,
+      "note": "示例：全口径城镇单位就业人员年平均工资÷12（西安市统计局口径）",
+      "sourceUrl": "https://tjj.xa.gov.cn/"
+    }
+  }
+}
