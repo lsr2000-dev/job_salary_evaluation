@@ -35,8 +35,14 @@
           <button class="segmented__btn" data-period="day" type="button">按日(工作日)</button>
           <button class="segmented__btn" data-period="year" type="button">按年</button>
         </div>
-        <button id="enterDemoBtn" class="btn" type="button" title="载入三项示范工作，演示页面用法">
-          示范
+        <button
+          id="enterDemoBtn"
+          class="btn btn-demo"
+          type="button"
+          title="载入多地区对比范例，演示页面用法"
+          aria-label="示范：载入多地区对比范例"
+        >
+          <span class="btn__icon" aria-hidden="true">▶</span>示范
         </button>
         <button id="addJobBtn" class="btn btn-primary" type="button" title="添加对比工作（最多5个）">
           <span class="btn__icon">＋</span>
@@ -44,6 +50,22 @@
         </button>
       </div>
     </header>
+
+    <div id="welcomeHint" class="welcome-hint" role="region" aria-label="新手指引">
+      <div class="welcome-hint__inner">
+        <p class="welcome-hint__text">
+          首次使用？请点击右上角<strong>「示范」</strong>载入多地区对比范例（表格内数值均可修改）。
+        </p>
+        <button
+          id="welcomeHintDismissBtn"
+          class="btn welcome-hint__dismiss"
+          type="button"
+          aria-label="知道了，不再显示此提示"
+        >
+          知道了
+        </button>
+      </div>
+    </div>
 
     <div id="demoBanner" class="demo-banner is-hidden" role="region" aria-label="示范模式">
       <div class="demo-banner__inner">
@@ -68,6 +90,43 @@
           </div>
         </section>
 
+        <section id="salarySplitVizSection" class="viz-salary-split" aria-label="收入结构（比较货币）">
+          <div class="viz-salary-split__header">
+            <div class="viz-salary-split__titleRow">
+              <h2 class="viz-salary-split__title">收入结构对比</h2>
+              <span class="viz-salary-split__unit" id="salarySplitVizUnit" aria-hidden="true"></span>
+            </div>
+            <p class="viz-salary-split__sub">
+              将每份工作的<strong>税前毛收入</strong>拆为<strong>个人扣缴</strong>、<strong>必要开支</strong>与<strong>可支配所得</strong>（均为顶栏比较货币、按月口径）。名义收入高未必可支配更高。不构成税务建议。
+            </p>
+            <div id="salarySplitLegendHost" class="viz-salary-split__legend" role="list" aria-describedby="salarySplitLegendHint"></div>
+            <p id="salarySplitLegendHint" class="viz-salary-split__legendHint">
+              拖动图例可调整堆叠条内从左到右顺序（顺序保存在本机）；输入对比表后图表会同步更新。悬停色块可查看金额与占毛收入比例。
+            </p>
+          </div>
+          <div class="viz-salary-split__plotWrap">
+            <div id="salarySplitVizHost" class="viz-salary-split__host"></div>
+            <div class="viz-salary-split__axisRow" aria-hidden="true">
+              <div class="viz-salary-split__axisCell viz-salary-split__axisCell--pad"></div>
+              <div class="viz-salary-split__axisCell viz-salary-split__axisCell--plot">
+                <div id="salarySplitAxisTicks" class="viz-salary-split__axisTicks"></div>
+                <div class="viz-salary-split__axisBaseline" aria-hidden="true"></div>
+                <p class="viz-salary-split__axisCaption">
+                  横轴：金额（<span id="salarySplitAxisCode">—</span>）/ 月 · 各条右缘与最大毛收入对齐
+                </p>
+                <div class="viz-salary-split__axisRuler">
+                  <span id="salarySplitAxis0" class="viz-salary-split__axisRulerTick">0</span>
+                  <span id="salarySplitAxisQ1" class="viz-salary-split__axisRulerTick viz-salary-split__axisRulerTick--mid">—</span>
+                  <span id="salarySplitAxisQ2" class="viz-salary-split__axisRulerTick viz-salary-split__axisRulerTick--mid">—</span>
+                  <span id="salarySplitAxisQ3" class="viz-salary-split__axisRulerTick viz-salary-split__axisRulerTick--mid">—</span>
+                  <span id="salarySplitAxisMax" class="viz-salary-split__axisRulerTick">—</span>
+                </div>
+              </div>
+              <div class="viz-salary-split__axisCell viz-salary-split__axisCell--pad"></div>
+            </div>
+          </div>
+        </section>
+
         <section class="compare compare--full" aria-label="Excel 风格对比表">
           <div class="compare__header">
             <div class="compare__title">对比表（同指标成行、同工作成列）</div>
@@ -85,6 +144,8 @@
       </p>
     </footer>
 
+    <div id="salarySplitTooltip" class="viz-salary-split__tooltip is-hidden" role="tooltip" aria-live="polite"></div>
+
     <dialog id="taxDialog" class="dialog">
       <div class="dialog__header">
         <div class="dialog__title">个税细节</div>
@@ -95,6 +156,16 @@
         <button class="btn" data-close-dialog type="button">关闭</button>
       </div>
     </dialog>
+
+    <button
+      type="button"
+      id="scrollToChartBtn"
+      class="fab-to-chart"
+      aria-label="回到页面顶部收入结构图"
+      title="回到收入结构图"
+    >
+      ↑ 图表
+    </button>
 
     <script src="./app.js"></script>
   </body>

@@ -3,6 +3,8 @@
 const STORAGE_KEY = "job_salary_evaluation_v1";
 /** 进入示范前备份整份可持久化状态，供「退出示范」还原 */
 const SESSION_PRE_DEMO_KEY = "job_salary_pre_demo_v1";
+/** 顶栏「新手指引」条是否已关闭（与整站存档键分离） */
+const WELCOME_HINT_DISMISSED_KEY = "job_salary_evaluation_welcome_hint_dismissed";
 
 /** 对比表最多列数（与存档截断、顶栏添加按钮一致） */
 const MAX_COMPARE_JOBS = 5;
@@ -764,8 +766,19 @@ function emptyNonDemoState() {
     demoActive: false,
     taxFeeShortcut: false,
     uiCollapse: defaultUiCollapse(),
+    salarySplitSegOrder: ["fee", "exp", "sav"],
     jobs: [defaultJob()],
   };
+}
+
+const SALARY_SPLIT_SEG_KEYS = /** @type {const} */ (["fee", "exp", "sav"]);
+
+/** @param {unknown} raw @returns {("fee"|"exp"|"sav")[]} */
+function normalizeSalarySplitSegOrder(raw) {
+  if (!Array.isArray(raw) || raw.length !== 3) return [...SALARY_SPLIT_SEG_KEYS];
+  const set = new Set(raw);
+  if (set.size !== 3 || !SALARY_SPLIT_SEG_KEYS.every((k) => set.has(k))) return [...SALARY_SPLIT_SEG_KEYS];
+  return /** @type {("fee"|"exp"|"sav")[]} */ ([raw[0], raw[1], raw[2]]);
 }
 
 /**
@@ -799,6 +812,7 @@ function parsePersistedPayload(parsed) {
     inputViewMode,
     demoActive,
     uiCollapse: normalizeUiCollapse(parsed?.uiCollapse),
+    salarySplitSegOrder: normalizeSalarySplitSegOrder(parsed?.salarySplitSegOrder),
     jobs: jobs.slice(0, MAX_COMPARE_JOBS).map((j) => {
       const merged = { ...defaultJob(), ...j, id: j?.id || uid() };
       merged.compareCurrency = compareCurrency;
@@ -882,9 +896,33 @@ function applyPayloadToState(payload) {
   state.inputViewMode = payload.inputViewMode;
   state.demoActive = payload.demoActive;
   state.uiCollapse = normalizeUiCollapse(payload.uiCollapse);
+  state.salarySplitSegOrder = normalizeSalarySplitSegOrder(payload.salarySplitSegOrder);
   state.jobs = payload.jobs;
   for (const j of state.jobs) j.compareCurrency = state.compareCurrency;
   applyThemeToDom(state.theme);
+}
+
+function persistDismissWelcomeHint() {
+  try {
+    localStorage.setItem(WELCOME_HINT_DISMISSED_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+function isWelcomeHintDismissed() {
+  try {
+    return localStorage.getItem(WELCOME_HINT_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function updateWelcomeHint() {
+  const el = document.getElementById("welcomeHint");
+  if (!el) return;
+  const hide = isWelcomeHintDismissed() || !!state.demoActive;
+  el.classList.toggle("is-hidden", hide);
 }
 
 async function enterDemoMode() {
@@ -897,6 +935,7 @@ async function enterDemoMode() {
   }
   const payload = await resolveDemoPayload();
   applyPayloadToState({ ...payload, demoActive: true });
+  persistDismissWelcomeHint();
   state.fxByJobId = {};
   saveState();
   syncToolbarFromState();
@@ -3989,6 +4028,469 @@ function updateDemoChrome() {
   if (enterBtn) enterBtn.classList.toggle("is-hidden", !!state.demoActive);
 }
 
+/** 展示口径 period 字段反推「按月」金额（与 calc 中 toPeriod 一致） */
+function salarySplitVizPeriodScale(job) {
+  const wd = workdaysForMode(job.workdayMode);
+  const p = state.period;
+  if (p === PERIODS.year) return 12;
+  if (p === PERIODS.day) return 1 / wd;
+  return 1;
+}
+
+/** @param {any} m @param {any} job */
+function salarySplitVizExpenseMonthlyParts(m, job) {
+  const s = salarySplitVizPeriodScale(job);
+  const rent = Number.isFinite(m.housingExpensePeriod) ? m.housingExpensePeriod / s : 0;
+  const comm = Number.isFinite(m.commuteExpensePeriod) ? m.commuteExpensePeriod / s : 0;
+  const food = Number.isFinite(m.foodExpensePeriod) ? m.foodExpensePeriod / s : 0;
+  const total = Number.isFinite(m.totalExpenseMonthly) ? m.totalExpenseMonthly : 0;
+  let extra = total - rent - comm - food;
+  if (!Number.isFinite(extra) || extra < 0) extra = 0;
+  return { rentM: rent, commuteM: comm, foodM: food, extraM: extra };
+}
+
+let salarySplitVizHoverSeg = null;
+
+function hideSalarySplitTooltip() {
+  const tip = document.getElementById("salarySplitTooltip");
+  if (tip) tip.classList.add("is-hidden");
+  if (salarySplitVizHoverSeg) {
+    salarySplitVizHoverSeg.classList.remove("is-viz-hover");
+    salarySplitVizHoverSeg = null;
+  }
+}
+
+function positionSalarySplitTooltip(tip, seg) {
+  if (!tip || !seg) return;
+  tip.classList.remove("is-hidden");
+  tip.style.position = "fixed";
+  tip.style.visibility = "hidden";
+  tip.style.left = "-10000px";
+  tip.style.top = "0";
+  const tw = tip.offsetWidth || 260;
+  const th = tip.offsetHeight || 100;
+  const r = seg.getBoundingClientRect();
+  const margin = 8;
+  let left = r.left + r.width / 2 - tw / 2;
+  let top = r.bottom + margin;
+  if (top + th > window.innerHeight - margin) top = Math.max(margin, r.top - th - margin);
+  left = Math.max(margin, Math.min(left, window.innerWidth - tw - margin));
+  top = Math.max(margin, Math.min(top, window.innerHeight - th - margin));
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+  tip.style.visibility = "";
+}
+
+/** @param {HTMLElement} tip @param {string} jobId @param {string} part fee|exp|sav|def */
+function fillSalarySplitTooltipContent(tip, jobId, part) {
+  const host = document.getElementById("salarySplitVizHost");
+  const map = host && host.__vizRowByJobId;
+  if (!tip || !map) return;
+  const row = map.get(jobId);
+  if (!row) return;
+  const { gross, fee, exp, sav, m, expenseParts } = row;
+  const pctNum = (x) => (gross > 0 && Number.isFinite(x) ? ((x / gross) * 100).toFixed(1) : null);
+
+  if (part === "fee") {
+    const tb = m.taxBreakdown || { taxItems: [], welfareItems: [] };
+    const items = [];
+    for (const x of tb.taxItems || []) {
+      if (Number.isFinite(x.amountMonthly) && Math.abs(x.amountMonthly) > 1e-9) {
+        items.push(
+          `<div class="viz-salary-split__tooltipItem"><span>${escapeHtml(x.label)}</span><span>${fmtMoneyWithCompareUnit(x.amountMonthly)}</span></div>`
+        );
+      }
+    }
+    for (const x of tb.welfareItems || []) {
+      if (Number.isFinite(x.amountMonthly) && Math.abs(x.amountMonthly) > 1e-9) {
+        items.push(
+          `<div class="viz-salary-split__tooltipItem"><span>${escapeHtml(x.label)}</span><span>${fmtMoneyWithCompareUnit(x.amountMonthly)}</span></div>`
+        );
+      }
+    }
+    const pf = pctNum(fee);
+    tip.innerHTML = `
+      <div class="viz-salary-split__tooltipTitle">个人扣缴</div>
+      <p class="viz-salary-split__tooltipLine">合计 <strong>${fmtMoneyWithCompareUnit(fee)}</strong> · 占税前毛收入 <strong>${pf != null ? `${pf}%` : "—"}</strong></p>
+      ${
+        items.length
+          ? `<div class="viz-salary-split__tooltipSub">组成</div>${items.join("")}`
+          : `<p class="viz-salary-split__tooltipLine">（无分项明细）</p>`
+      }`;
+    return;
+  }
+
+  if (part === "exp" && expenseParts) {
+    const { rentM, commuteM, foodM, extraM } = expenseParts;
+    const pe = pctNum(exp);
+    tip.innerHTML = `
+      <div class="viz-salary-split__tooltipTitle">必要开支</div>
+      <p class="viz-salary-split__tooltipLine">合计 <strong>${fmtMoneyWithCompareUnit(exp)}</strong> · 占税前毛收入 <strong>${pe != null ? `${pe}%` : "—"}</strong></p>
+      <div class="viz-salary-split__tooltipSub">组成（按月）</div>
+      <div class="viz-salary-split__tooltipItem"><span>住房</span><span>${fmtMoneyWithCompareUnit(rentM)}</span></div>
+      <div class="viz-salary-split__tooltipItem"><span>通勤</span><span>${fmtMoneyWithCompareUnit(commuteM)}</span></div>
+      <div class="viz-salary-split__tooltipItem"><span>工作日饮食</span><span>${fmtMoneyWithCompareUnit(foodM)}</span></div>
+      <div class="viz-salary-split__tooltipItem"><span>其他必要支出</span><span>${fmtMoneyWithCompareUnit(extraM)}</span></div>`;
+    return;
+  }
+
+  if (part === "sav") {
+    const ps = pctNum(sav);
+    tip.innerHTML = `
+      <div class="viz-salary-split__tooltipTitle">可支配所得</div>
+      <p class="viz-salary-split__tooltipLine">金额 <strong>${fmtMoneyWithCompareUnit(sav)}</strong> · 占税前毛收入 <strong>${ps != null ? `${ps}%` : "—"}</strong></p>
+      <p class="viz-salary-split__tooltipLine">口径：税前毛收入 − 个人扣缴 − 必要开支（与对比表「所得」一致）。</p>`;
+    return;
+  }
+
+  if (part === "def") {
+    const deficit = -sav;
+    const pd = pctNum(deficit);
+    tip.innerHTML = `
+      <div class="viz-salary-split__tooltipTitle">超支（可支配为负）</div>
+      <p class="viz-salary-split__tooltipLine">缺口约 <strong>${fmtMoneyWithCompareUnit(deficit)}</strong> · 占税前毛收入 <strong>${pd != null ? `${pd}%` : "—"}</strong></p>
+      <p class="viz-salary-split__tooltipLine">个人扣缴与必要开支合计超过税前毛收入时的赤字示意。</p>`;
+  }
+}
+
+function initSalarySplitVizInteractions() {
+  const host = document.getElementById("salarySplitVizHost");
+  const tip = document.getElementById("salarySplitTooltip");
+  if (!host || !tip || host.dataset.salarySplitVizBound === "1") return;
+  host.dataset.salarySplitVizBound = "1";
+
+  host.addEventListener("pointerout", (e) => {
+    const rt = /** @type {Node|null} */ (e.relatedTarget);
+    if (rt && host.contains(rt)) return;
+    hideSalarySplitTooltip();
+  });
+
+  host.addEventListener("pointermove", (e) => {
+    const seg = /** @type {HTMLElement|null} */ (e.target && e.target.closest && e.target.closest("[data-viz-seg]"));
+    if (!seg || !host.contains(seg)) {
+      hideSalarySplitTooltip();
+      return;
+    }
+    const jobId = seg.getAttribute("data-job-id");
+    const part = seg.getAttribute("data-viz-seg");
+    if (!jobId || !part) return;
+    if (salarySplitVizHoverSeg !== seg) {
+      if (salarySplitVizHoverSeg) salarySplitVizHoverSeg.classList.remove("is-viz-hover");
+      salarySplitVizHoverSeg = seg;
+      seg.classList.add("is-viz-hover");
+      fillSalarySplitTooltipContent(tip, jobId, part);
+      requestAnimationFrame(() => positionSalarySplitTooltip(tip, seg));
+      return;
+    }
+    positionSalarySplitTooltip(tip, seg);
+  });
+}
+
+const SALARY_SPLIT_LEGEND_LABELS = {
+  fee: "个人扣缴（税与五险一金个人等）",
+  exp: "必要开支（住、行、食等）",
+  sav: "可支配所得",
+};
+
+/** 更新横轴刻度与竖线（与绘图区同宽，仅中间列） */
+function renderSalarySplitAxisStrip(gMax, hasValidRow) {
+  const tickHost = document.getElementById("salarySplitAxisTicks");
+  const q1 = document.getElementById("salarySplitAxisQ1");
+  const q2 = document.getElementById("salarySplitAxisQ2");
+  const q3 = document.getElementById("salarySplitAxisQ3");
+  const axis0 = document.getElementById("salarySplitAxis0");
+  const axisMax = document.getElementById("salarySplitAxisMax");
+  if (!tickHost || !q1 || !q2 || !q3 || !axis0 || !axisMax) return;
+  if (!hasValidRow || !Number.isFinite(gMax) || gMax <= 0) {
+    tickHost.innerHTML = "";
+    q1.textContent = "—";
+    q2.textContent = "—";
+    q3.textContent = "—";
+    axis0.textContent = "0";
+    axisMax.textContent = "—";
+    return;
+  }
+  tickHost.innerHTML = [0, 0, 0, 0, 0]
+    .map(
+      () =>
+        `<div class="viz-salary-split__axisTickCol" aria-hidden="true"><div class="viz-salary-split__axisTickStem"></div></div>`
+    )
+    .join("");
+  q1.textContent = fmtMoney(gMax * 0.25);
+  q2.textContent = fmtMoney(gMax * 0.5);
+  q3.textContent = fmtMoney(gMax * 0.75);
+  axis0.textContent = fmtMoney(0);
+  axisMax.textContent = fmtMoney(gMax);
+}
+
+const SALARY_SPLIT_VB_W = 1000;
+const SALARY_SPLIT_VB_H = 22;
+
+/**
+ * 全宽 viewBox 表示 0…Gmax；段宽 = amount/Gmax×VB_W，屏上宽度 = amount/Gmax×绘图区宽（跨行可比）。段内不再绘文字，避免非等比拉伸压扁。
+ * @param {("fee"|"exp"|"sav")[]} order
+ * @param {{ fee: number, exp: number, sav: number, gross: number, name: string, job: { id: string } }} rowCtx
+ * @param {number} gMaxAxis 全表最大毛收入（与横轴比例尺一致）
+ * @param {string} compare 比较货币代码
+ */
+function buildSalarySplitSvgTrack(order, rowCtx, gMaxAxis, compare) {
+  const { fee, exp, sav, gross, name, job } = rowCtx;
+  const jid = escapeHtml(String(job.id));
+  const VB_W = SALARY_SPLIT_VB_W;
+  const VB_H = SALARY_SPLIT_VB_H;
+  const barW = gMaxAxis > 0 && Number.isFinite(gross) ? (gross / gMaxAxis) * VB_W : 0;
+  let x = 0;
+  let inner = "";
+  if (sav >= 0) {
+    for (const key of order) {
+      let amount = 0;
+      let segClass = "";
+      /** @type {string} */
+      let vizSeg = "fee";
+      if (key === "fee") {
+        amount = fee;
+        segClass = "fee";
+        vizSeg = "fee";
+      } else if (key === "exp") {
+        amount = exp;
+        segClass = "exp";
+        vizSeg = "exp";
+      } else {
+        amount = sav;
+        segClass = "sav";
+        vizSeg = "sav";
+      }
+      const wRaw = gMaxAxis > 0 && Number.isFinite(amount) && amount > 1e-12 ? (amount / gMaxAxis) * VB_W : 0;
+      if (wRaw > 0) {
+        inner += `<rect class="viz-salary-split__seg viz-salary-split__svgSeg viz-salary-split__seg--${segClass}" x="${x}" y="0" width="${wRaw}" height="${VB_H}" data-job-id="${jid}" data-viz-seg="${vizSeg}" rx="2" ry="2"/>`;
+      }
+      x += wRaw;
+    }
+  } else {
+    const deficit = -sav;
+    const denom = fee + exp + deficit;
+    const safeDenom = denom > 1e-12 ? denom : 1;
+    for (const key of order) {
+      let frac = 0;
+      let segClass = "";
+      /** @type {string} */
+      let vizSeg = "fee";
+      if (key === "fee") {
+        frac = fee / safeDenom;
+        segClass = "fee";
+        vizSeg = "fee";
+      } else if (key === "exp") {
+        frac = exp / safeDenom;
+        segClass = "exp";
+        vizSeg = "exp";
+      } else {
+        frac = deficit / safeDenom;
+        segClass = "def";
+        vizSeg = "def";
+      }
+      const rw = frac * barW;
+      if (rw > 0) {
+        inner += `<rect class="viz-salary-split__seg viz-salary-split__svgSeg viz-salary-split__seg--${segClass}" x="${x}" y="0" width="${rw}" height="${VB_H}" data-job-id="${jid}" data-viz-seg="${vizSeg}" rx="2" ry="2"/>`;
+      }
+      x += rw;
+    }
+  }
+  const barEnd = barW;
+  const rest = VB_W - barEnd;
+  if (rest > 0.25) {
+    inner += `<rect class="viz-salary-split__svgUnused" x="${barEnd}" y="0" width="${rest}" height="${VB_H}" pointer-events="none"/>`;
+  }
+  const aria = `${escapeHtml(name)}：税前毛收入 ${fmtMoney(gross)} ${compare}`;
+  return `<svg class="viz-salary-split__svg" viewBox="0 0 ${VB_W} ${VB_H}" preserveAspectRatio="none" role="img" aria-label="${aria}"><g>${inner}</g></svg>`;
+}
+
+/** @template T @param {T[]} arr @param {number} fromIdx @param {number} toIdx */
+function arrayMove(arr, fromIdx, toIdx) {
+  const next = arr.slice();
+  const [el] = next.splice(fromIdx, 1);
+  next.splice(toIdx, 0, el);
+  return next;
+}
+
+function renderSalarySplitLegend() {
+  const host = document.getElementById("salarySplitLegendHost");
+  if (!host) return;
+  const order = normalizeSalarySplitSegOrder(state.salarySplitSegOrder);
+  state.salarySplitSegOrder = order;
+  const sw = { fee: "viz-salary-split__swatch--fee", exp: "viz-salary-split__swatch--exp", sav: "viz-salary-split__swatch--sav" };
+  host.innerHTML = order
+    .map((key) => {
+      const lab = SALARY_SPLIT_LEGEND_LABELS[key];
+      return `<span class="viz-salary-split__legendItem" role="listitem" draggable="true" data-seg-key="${key}" title="拖动排序（改变条内从左到右顺序）"><span class="viz-salary-split__swatch ${sw[key]}"></span>${escapeHtml(lab)}</span>`;
+    })
+    .join("");
+}
+
+function initSalarySplitLegendInteractions() {
+  const host = document.getElementById("salarySplitLegendHost");
+  if (!host || host.dataset.salarySplitLegendBound === "1") return;
+  host.dataset.salarySplitLegendBound = "1";
+  host.addEventListener("dragstart", (e) => {
+    const item = /** @type {HTMLElement|null} */ (e.target && e.target.closest && e.target.closest("[data-seg-key]"));
+    if (!item || !host.contains(item)) return;
+    item.classList.add("is-dragging");
+    e.dataTransfer?.setData("text/plain", item.getAttribute("data-seg-key") || "");
+  });
+  host.addEventListener("dragend", () => {
+    host.querySelectorAll(".is-dragging").forEach((el) => el.classList.remove("is-dragging"));
+    host.querySelectorAll(".is-drag-over").forEach((el) => el.classList.remove("is-drag-over"));
+  });
+  host.addEventListener("dragover", (e) => {
+    e.preventDefault();
+  });
+  host.addEventListener("dragenter", (e) => {
+    const item = /** @type {HTMLElement|null} */ (e.target && e.target.closest && e.target.closest("[data-seg-key]"));
+    if (item && host.contains(item)) item.classList.add("is-drag-over");
+  });
+  host.addEventListener("dragleave", (e) => {
+    const item = /** @type {HTMLElement|null} */ (e.target && e.target.closest && e.target.closest("[data-seg-key]"));
+    if (item && host.contains(item)) item.classList.remove("is-drag-over");
+  });
+  host.addEventListener("drop", (e) => {
+    e.preventDefault();
+    host.querySelectorAll(".is-drag-over").forEach((el) => el.classList.remove("is-drag-over"));
+    const fromKey = e.dataTransfer?.getData("text/plain") || "";
+    const toItem = /** @type {HTMLElement|null} */ (e.target && e.target.closest && e.target.closest("[data-seg-key]"));
+    if (!fromKey || !toItem || !host.contains(toItem)) return;
+    const toKey = toItem.getAttribute("data-seg-key") || "";
+    if (!toKey || fromKey === toKey) return;
+    const order = normalizeSalarySplitSegOrder(state.salarySplitSegOrder);
+    const fromIdx = order.indexOf(fromKey);
+    const toIdx = order.indexOf(toKey);
+    if (fromIdx < 0 || toIdx < 0) return;
+    state.salarySplitSegOrder = arrayMove(order, fromIdx, toIdx);
+    saveState();
+    renderAll();
+  });
+}
+
+function initScrollToChartBtn() {
+  const btn = document.getElementById("scrollToChartBtn");
+  const sec = document.getElementById("salarySplitVizSection");
+  if (!btn || !sec || btn.dataset.scrollToChartBound === "1") return;
+  btn.dataset.scrollToChartBound = "1";
+  btn.addEventListener("click", () => {
+    sec.scrollIntoView({ behavior: "smooth", block: "start" });
+    try {
+      btn.blur();
+    } catch {
+      // ignore
+    }
+  });
+}
+
+/** 收入结构图：共享横轴比例尺（0～Gmax），毛收入 = 扣缴 + 必要开支 + 可支配（比较货币、按月） */
+function renderSalarySplitViz() {
+  const host = document.getElementById("salarySplitVizHost");
+  const unitEl = document.getElementById("salarySplitVizUnit");
+  const axisCode = document.getElementById("salarySplitAxisCode");
+  if (!host) return;
+  const compare = getCompareCurrencyCode();
+  if (unitEl) unitEl.textContent = `（${compare} / 月 · 比较货币）`;
+  if (axisCode) axisCode.textContent = compare;
+
+  if (state.fxLoading) {
+    host.innerHTML = `<div class="viz-salary-split__loading" role="status">正在获取汇率…</div>`;
+    renderSalarySplitAxisStrip(0, false);
+    host.__vizRowByJobId = new Map();
+    return;
+  }
+
+  const jobs = state.jobs || [];
+  if (jobs.length === 0) {
+    host.innerHTML = `<div class="viz-salary-split__empty">暂无工作列</div>`;
+    renderSalarySplitAxisStrip(0, false);
+    host.__vizRowByJobId = new Map();
+    return;
+  }
+
+  const rows = jobs.map((job, idx) => {
+    const raw = calc(job);
+    const rate = effectiveFxRate(job);
+    const m = applyIncomeToCompareMoney(raw, rate);
+    const gross = m.grossIncomeMonthly;
+    const fee = m.feeMonthly;
+    const exp = m.totalExpenseMonthly;
+    const sav = m.savingsMonthly;
+    const badFx = !!m._fxInvalid;
+    const badNums =
+      !Number.isFinite(gross) ||
+      !Number.isFinite(fee) ||
+      !Number.isFinite(exp) ||
+      !Number.isFinite(sav) ||
+      gross <= 0;
+    const invalid = badFx || badNums;
+    const expenseParts = !invalid ? salarySplitVizExpenseMonthlyParts(m, job) : null;
+    return { job, idx, name: jobDisplayName(job, idx), gross, fee, exp, sav, invalid, badFx, m, expenseParts };
+  });
+
+  rows.sort((a, b) => {
+    if (a.invalid && !b.invalid) return 1;
+    if (!a.invalid && b.invalid) return -1;
+    return (b.gross || 0) - (a.gross || 0);
+  });
+
+  const validGrosses = rows.filter((r) => !r.invalid).map((r) => r.gross);
+  const gMax = validGrosses.length ? Math.max(...validGrosses) : 0;
+  renderSalarySplitAxisStrip(gMax, validGrosses.length > 0);
+
+  const segOrder = normalizeSalarySplitSegOrder(state.salarySplitSegOrder);
+
+  const pctOfGross = (part, g) =>
+    Number.isFinite(part) && Number.isFinite(g) && g > 0 ? `${((part / g) * 100).toFixed(part / g < 0.08 ? 1 : 0)}%` : "";
+
+  const byJob = new Map();
+  for (const row of rows) {
+    if (!row.invalid) byJob.set(row.job.id, row);
+  }
+  host.__vizRowByJobId = byJob;
+
+  host.innerHTML = rows
+    .map((row) => {
+      if (row.invalid) {
+        const reason = row.badFx ? "汇率不可用" : "暂无有效毛收入";
+        return `<div class="viz-salary-split__row">
+        <div class="viz-salary-split__name" title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</div>
+        <div class="viz-salary-split__plotCell">
+          <div class="viz-salary-split__barSlot viz-salary-split__barSlot--invalid">
+            <div class="viz-salary-split__svgBarWrap">
+              <svg class="viz-salary-split__svg" viewBox="0 0 ${SALARY_SPLIT_VB_W} ${SALARY_SPLIT_VB_H}" preserveAspectRatio="none" aria-hidden="true">
+                <rect class="viz-salary-split__svgSeg viz-salary-split__svgSeg--muted" x="0" y="0" width="${SALARY_SPLIT_VB_W}" height="${SALARY_SPLIT_VB_H}" rx="4" ry="4"/>
+              </svg>
+              <span class="viz-salary-split__placeholderMark">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="viz-salary-split__meta">${escapeHtml(reason)}</div>
+      </div>`;
+      }
+      const { gross, fee, exp, sav, name, job } = row;
+      const retPct = (sav / gross) * 100;
+      const retCls = sav < 0 ? "neg" : "";
+
+      const trackSvg = buildSalarySplitSvgTrack(segOrder, { fee, exp, sav, gross, name, job }, gMax, compare);
+
+      const metaLine = `毛收入 ${fmtMoneyWithCompareUnit(gross)} · 有效留存 ${retPct.toFixed(1)}%`;
+      return `<div class="viz-salary-split__row">
+      <div class="viz-salary-split__name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+      <div class="viz-salary-split__plotCell">
+        <div class="viz-salary-split__barSlot">
+          <div class="viz-salary-split__svgBarWrap">
+            ${trackSvg}
+          </div>
+        </div>
+      </div>
+      <div class="viz-salary-split__meta">${escapeHtml(metaLine)}<br/>可支配 <strong class="${retCls}">${fmtMoneyWithCompareUnit(sav)}</strong></div>
+    </div>`;
+    })
+    .join("");
+}
+
 function renderAll() {
   renderCompareTablePreserveFocus();
 
@@ -4003,6 +4505,9 @@ function renderAll() {
   syncToolbarFromState();
   syncThemeToggleButton();
   updateDemoChrome();
+  updateWelcomeHint();
+  renderSalarySplitLegend();
+  renderSalarySplitViz();
 }
 
 function fillMajorCurrencySelect(el) {
@@ -4052,8 +4557,12 @@ function getJobById(jobId) {
 function updateOne(jobId, field) {
   const job = getJobById(jobId);
   if (!job) return;
-  if (field !== undefined && shouldSkipCompareTableRefreshForActiveInput(jobId, field)) return;
+  if (field !== undefined && shouldSkipCompareTableRefreshForActiveInput(jobId, field)) {
+    renderSalarySplitViz();
+    return;
+  }
   renderCompareTablePreserveFocus();
+  renderSalarySplitViz();
 }
 
 /** 填写项 input 连打时合并重绘，避免每键替换 input DOM */
@@ -4295,9 +4804,18 @@ function initTopbar() {
     exitDemoBtn.addEventListener("click", () => exitDemoMode());
   }
 
+  const welcomeHintDismissBtn = document.getElementById("welcomeHintDismissBtn");
+  if (welcomeHintDismissBtn) {
+    welcomeHintDismissBtn.addEventListener("click", () => {
+      persistDismissWelcomeHint();
+      updateWelcomeHint();
+    });
+  }
+
   syncToolbarFromState();
   syncThemeToggleButton();
   updateDemoChrome();
+  updateWelcomeHint();
 }
 
 function initDialog() {
@@ -4565,6 +5083,7 @@ async function bootstrap() {
   }
   state.taxFeeShortcut = taxFeeShortcut;
   state.uiCollapse = normalizeUiCollapse(state.uiCollapse);
+  state.salarySplitSegOrder = normalizeSalarySplitSegOrder(state.salarySplitSegOrder);
   applyThemeToDom(state.theme);
 
   const focusStage = document.getElementById("mainFocusStage");
@@ -4573,6 +5092,9 @@ async function bootstrap() {
   }
 
   initTopbar();
+  initSalarySplitVizInteractions();
+  initSalarySplitLegendInteractions();
+  initScrollToChartBtn();
   initDialog();
   initCompareEvents();
   void refreshFxRates().then(() => renderAll());
